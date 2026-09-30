@@ -19,7 +19,15 @@ DEXTR Commander is an execution component, not a sandbox. The `execute_command` 
 
 Do not expose the HTTP endpoint directly to the public Internet without an explicit access-control design. A public MCP endpoint backed by unrestricted shell execution is equivalent to remote administrative access to the host.
 
-The repository does not contain credentials, Tailscale state, ChatGPT configuration, or deployment-specific secrets.
+The repository is intended to contain source and documentation only. Deployment credentials, tunnel configuration, host-specific state, and secret-bearing environment files must remain outside the repository.
+
+Before a public release, run:
+
+```bash
+./scripts/security-audit.sh
+```
+
+See `SECURITY.md` for the secret-handling and incident-response procedure.
 
 ## Build
 

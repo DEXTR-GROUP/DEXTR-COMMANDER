@@ -16,6 +16,29 @@ Recommended deployment properties:
 5. keep deployment credentials and tunnel configuration outside the repository;
 6. audit commands and network exposure before enabling remote access.
 
+## Secret handling
+
+The public repository must never contain:
+- API keys, access tokens, passwords, session tokens, or bearer credentials;
+- private SSH/TLS/signing keys or certificate bundles;
+- tunnel credentials or host-specific deployment state;
+- `.env` files or equivalent secret-bearing configuration.
+
+Run the repository audit before every public release:
+
+```bash
+./scripts/security-audit.sh
+```
+
+The audit scans every Git blob reachable from repository refs, not only the current working tree. A successful audit is evidence that the checked Git history contains no matches for the repository's configured credential patterns; it is not a substitute for revocation when a credential has ever been exposed.
+
+If a credential is suspected to have been committed:
+1. revoke or rotate it immediately;
+2. determine which Git refs contained it;
+3. remove the secret from reachable history;
+4. re-run the audit;
+5. verify the credential is no longer valid.
+
 ## Reporting
 
 Do not disclose credentials, private keys, tunnel tokens, host addresses, or other sensitive deployment data in a public issue.

@@ -1,2 +1,21 @@
 /target/
 Cargo.lock
+
+# Local/deployment secrets and sensitive credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_ed25519
+*.tfstate
+*.tfstate.*
+credentials
+credentials.*
+secrets
+secrets.*
