@@ -1,0 +1,15 @@
+[package]
+name = "dextr-commander"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Lightweight Rust MCP server for controlled remote command and file operations."
+repository = "https://github.com/DEXTR-GROUP/DEXTR-COMMANDER"
+readme = "README.md"
+
+[dependencies]
+tokio = { version = "1.38", features = ["io-util", "io-std", "macros", "rt-multi-thread", "net"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+axum = "0.8"
+rmcp = { version = "3.3.1", default-features = false, features = ["server", "macros", "transport-streamable-http-server"] }
