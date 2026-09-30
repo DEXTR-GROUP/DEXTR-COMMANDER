@@ -1,0 +1,19 @@
+[Unit]
+Description=DEXTR Commander MCP Streamable HTTP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dextr
+Group=dextr
+ExecStart=/usr/local/bin/dextr-http
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
