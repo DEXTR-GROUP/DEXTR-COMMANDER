@@ -24,7 +24,7 @@ The repository is intended to contain source and documentation only. Deployment 
 Before a public release, run:
 
 ```bash
-./scripts/security-audit.sh
+bash scripts/security-audit.sh
 ```
 
 See `SECURITY.md` for the secret-handling and incident-response procedure.
