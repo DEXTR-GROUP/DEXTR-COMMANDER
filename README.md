@@ -151,6 +151,17 @@ The repository includes:
 
 Before any public or remote deployment, review authentication, authorization, rate limiting, replay protection, command policy, file-access policy, and service-account privileges.
 
+## Remote connection
+
+For remote MCP use, see [Remote Connection](docs/REMOTE-CONNECTION.md) and [Deployment](docs/DEPLOYMENT.md).
+
+The public documentation describes the real connection models, including private Tailscale networking and an authenticated gateway. Production hostnames and paths should be published when they are part of the supported deployment; credentials and node secrets must remain outside Git.
+
+Authentication and authorization are documented separately:
+- [Authentication](docs/AUTHENTICATION.md)
+- [Authorization](docs/AUTHORIZATION.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+
 ## Documentation
 
 - [Roadmap](ROADMAP.md)
