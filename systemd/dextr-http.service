@@ -26,8 +26,5 @@ LockPersonality=true
 RestrictRealtime=true
 RestrictNamespaces=true
 
-# The service is expected to bind to its documented loopback MCP endpoint.
-# Remote access must be provided by the deployment network/security boundary.
-
 [Install]
 WantedBy=multi-user.target
