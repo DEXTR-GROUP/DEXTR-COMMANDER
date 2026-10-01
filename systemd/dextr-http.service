@@ -1,5 +1,6 @@
 [Unit]
 Description=DEXTR Commander MCP Streamable HTTP server
+Documentation=https://github.com/DEXTR-GROUP/DEXTR-COMMANDER
 After=network-online.target
 Wants=network-online.target
 
@@ -10,10 +11,23 @@ Group=dextr
 ExecStart=/usr/local/bin/dextr-http
 Restart=on-failure
 RestartSec=2
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+
+# The service is expected to bind to its documented loopback MCP endpoint.
+# Remote access must be provided by the deployment network/security boundary.
 
 [Install]
 WantedBy=multi-user.target
