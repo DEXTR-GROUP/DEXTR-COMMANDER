@@ -45,6 +45,9 @@ install -o root -g root -m 0644 "${SOURCE_DIR}/systemd/dextr-http.service" "${SY
 
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}"
+
+# Проверка наличия системной службы перед запуском
+[ -f "${SYSTEMD_UNIT}" ] || die "файл системной службы не установлен"
 systemctl restart "${SERVICE_NAME}"
 
 info "Проверка службы"
