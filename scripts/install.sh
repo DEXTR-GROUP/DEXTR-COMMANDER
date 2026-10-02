@@ -1,82 +1,88 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PREFIX="${PREFIX:-/usr/local}"
-CONFIG_DIR="${CONFIG_DIR:-/etc/dextr}"
-STATE_DIR="${STATE_DIR:-/var/lib/dextr}"
-LOG_DIR="${LOG_DIR:-/var/log/dextr}"
-SERVICE_USER="${SERVICE_USER:-dextr}"
-SERVICE_GROUP="${SERVICE_GROUP:-dextr}"
+PREFIX="/usr/local/bin"
+CONFIG_DIR="/etc/dextr"
+STATE_DIR="/var/lib/dextr"
+LOG_DIR="/var/log/dextr"
+SERVICE_USER="dextr"
+SERVICE_GROUP="dextr"
+SERVICE_NAME="dextr-http.service"
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME"
 
-fail() { echo "ОШИБКА: $*" >&2; exit 1; }
-info() { echo "[DEXTR] $*"; }
-
-[[ "${EUID}" -eq 0 ]] || fail "установщик необходимо запускать от root."
-command -v systemctl >/dev/null || fail "systemd не найден."
-command -v install >/dev/null || fail "команда install не найдена."
-
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-BINARY="${PROJECT_ROOT}/target/release/dextr-http"
-UNIT="${PROJECT_ROOT}/systemd/dextr-http.service"
-
-[[ -x "${BINARY}" ]] || fail "не найден готовый бинарник: ${BINARY}. Сначала выполните cargo build --release."
-[[ -f "${UNIT}" ]] || fail "не найден файл службы: ${UNIT}."
-
-info "Создание системной группы: ${SERVICE_GROUP}"
-if ! getent group "${SERVICE_GROUP}" >/dev/null; then
-  groupadd --system "${SERVICE_GROUP}"
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "Использование: sudo ./scripts/install.sh [каталог с готовыми бинарниками]"
+  echo "По умолчанию используется target/release."
+  exit 0
 fi
 
-info "Создание системного пользователя: ${SERVICE_USER}"
-if ! id "${SERVICE_USER}" >/dev/null 2>&1; then
-  useradd --system --gid "${SERVICE_GROUP}" --home-dir /var/lib/dextr --no-create-home --shell /usr/sbin/nologin "${SERVICE_USER}"
+[[ "$EUID" -eq 0 ]] || { echo "Ошибка: запустите установщик с правами root." >&2; exit 1; }
+[[ "$(uname -s)" == "Linux" ]] || { echo "Ошибка: установщик предназначен для Linux." >&2; exit 1; }
+
+SOURCE_DIR="${1:-target/release}"
+for binary in dextr-commander dextr-http; do
+  [[ -f "$SOURCE_DIR/$binary" ]] || { echo "Ошибка: не найден $SOURCE_DIR/$binary" >&2; exit 1; }
+  chmod +x "$SOURCE_DIR/$binary"
+done
+
+getent group "$SERVICE_GROUP" >/dev/null 2>&1 || groupadd --system "$SERVICE_GROUP"
+id "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --gid "$SERVICE_GROUP" --home-dir "$STATE_DIR" --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+
+install -d -o root -g "$SERVICE_GROUP" -m 0750 "$CONFIG_DIR"
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$STATE_DIR"
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$LOG_DIR"
+
+install -m 0755 "$SOURCE_DIR/dextr-commander" "$PREFIX/dextr-commander"
+install -m 0755 "$SOURCE_DIR/dextr-http" "$PREFIX/dextr-http"
+
+if [[ ! -f "$SERVICE_FILE" ]]; then
+  cat > "$SERVICE_FILE" <<'EOF'
+[Unit]
+Description=DEXTR Commander MCP Streamable HTTP server
+Documentation=https://github.com/DEXTR-GROUP/DEXTR-COMMANDER
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dextr
+Group=dextr
+ExecStart=/usr/local/bin/dextr-http
+Restart=on-failure
+RestartSec=2
+StartLimitIntervalSec=60
+StartLimitBurst=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
 fi
 
-info "Создание каталогов"
-install -d -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" -m 0750 "${CONFIG_DIR}"
-install -d -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" -m 0750 "${STATE_DIR}"
-install -d -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" -m 0750 "${LOG_DIR}"
-
-info "Установка программы"
-install -o root -g root -m 0755 "${BINARY}" "${PREFIX}/bin/dextr-http"
-
-info "Установка системной службы"
-install -o root -g root -m 0644 "${UNIT}" /etc/systemd/system/dextr-http.service
-
-info "Проверка конфигурации systemd"
-systemd-analyze verify /etc/systemd/system/dextr-http.service
-
-info "Перечитывание конфигурации systemd"
 systemctl daemon-reload
+systemctl enable "$SERVICE_NAME"
+systemctl restart "$SERVICE_NAME"
 
-info "Включение автоматического запуска"
-systemctl enable dextr-http.service
-
-info "Запуск DEXTR Commander"
-systemctl restart dextr-http.service
-
-sleep 1
-
-info "Проверка состояния"
-if ! systemctl is-active --quiet dextr-http.service; then
-  systemctl status dextr-http.service --no-pager || true
-  journalctl -u dextr-http.service --no-pager -n 50 || true
-  fail "DEXTR Commander не запустился."
+if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+  echo "Ошибка: DEXTR Commander не запустился." >&2
+  systemctl status "$SERVICE_NAME" --no-pager || true
+  journalctl -u "$SERVICE_NAME" --no-pager -n 50 || true
+  exit 1
 fi
 
-info "Проверка автоматического запуска"
-systemctl is-enabled --quiet dextr-http.service || fail "автоматический запуск не включён."
-
-info "Установка завершена."
 echo
-echo "DEXTR Commander: работает"
-echo "Автозапуск:     включён"
-echo "Пользователь:   ${SERVICE_USER}"
-echo "Конфигурация:   ${CONFIG_DIR}"
-echo "Состояние:      ${STATE_DIR}"
-echo "Журналы:        ${LOG_DIR}"
-echo
-echo "Проверка:"
-echo "  systemctl status dextr-http.service"
-echo "  journalctl -u dextr-http.service"
+echo "DEXTR Commander установлен."
+echo "Служба: активна"
+echo "Автозапуск: включён"
+echo "Пользователь: $SERVICE_USER"
+echo "MCP: http://127.0.0.1:8787/mcp"
