@@ -151,6 +151,21 @@ The repository includes:
 
 Before any public or remote deployment, review authentication, authorization, rate limiting, replay protection, command policy, file-access policy, and service-account privileges.
 
+## Установка «из коробки»
+
+Для обычного пользователя предусмотрен установщик:
+
+```bash
+chmod +x install.sh
+sudo ./install.sh
+```
+
+Он создаёт системного пользователя, каталоги DEXTR Commander, устанавливает программу и системную службу, включает автоматический запуск и проверяет результат.
+
+Подробная инструкция: [Установка](docs/INSTALL.md).
+
+Для разработчиков остаётся установка из исходников через Cargo.
+
 ## Remote connection
 
 For remote MCP use, see [Remote Connection](docs/REMOTE-CONNECTION.md) and [Deployment](docs/DEPLOYMENT.md).
