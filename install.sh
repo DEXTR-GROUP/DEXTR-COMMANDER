@@ -1,75 +1,65 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PREFIX="${PREFIX:-/usr/local}"
-CONFIG_DIR="${CONFIG_DIR:-/etc/dextr}"
-STATE_DIR="${STATE_DIR:-/var/lib/dextr}"
-LOG_DIR="${LOG_DIR:-/var/log/dextr}"
-SERVICE_USER="${SERVICE_USER:-dextr}"
+PREFIX="/usr/local/bin"
+CONFIG_DIR="/etc/dextr"
+STATE_DIR="/var/lib/dextr"
+LOG_DIR="/var/log/dextr"
+SERVICE_USER="dextr"
+SERVICE_GROUP="dextr"
 SERVICE_NAME="dextr-http.service"
-BINARY_NAME="dextr-http"
 
-if [[ "${EUID}" -ne 0 ]]; then
-  echo "Ошибка: установщик необходимо запускать с правами администратора." >&2
-  exit 1
-fi
+die() { echo "Ошибка: $*" >&2; exit 1; }
+need_root() { [ "$(id -u)" -eq 0 ] || die "установщик должен быть запущен от root."; }
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die "не найдена команда: $1"; }
 
-for command in install systemctl id; do
-  command -v "$command" >/dev/null 2>&1 || {
-    echo "Ошибка: не найдена необходимая команда: $command" >&2
-    exit 1
-  }
-done
+need_root
+need_cmd install
+need_cmd systemctl
+need_cmd id
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-BINARY="$SCRIPT_DIR/target/release/$BINARY_NAME"
-SERVICE_FILE="$SCRIPT_DIR/systemd/$SERVICE_NAME"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+BINARY="$SCRIPT_DIR/target/release/dextr-http"
+UNIT="$SCRIPT_DIR/systemd/dextr-http.service"
 
-if [[ ! -x "$BINARY" ]]; then
-  echo "Ошибка: отсутствует готовая программа: $BINARY" >&2
-  echo "Для установки из исходников сначала выполните: cargo build --release --bin dextr-http" >&2
-  exit 1
-fi
+[ -x "$BINARY" ] || die "не найден готовый файл $BINARY. Сначала соберите релиз командой: cargo build --release --bin dextr-http"
+[ -f "$UNIT" ] || die "не найден файл службы: $UNIT"
 
-if [[ ! -f "$SERVICE_FILE" ]]; then
-  echo "Ошибка: отсутствует файл службы: $SERVICE_FILE" >&2
-  exit 1
+echo "Установка DEXTR Commander..."
+
+if ! getent group "$SERVICE_GROUP" >/dev/null 2>&1; then
+    groupadd --system "$SERVICE_GROUP"
 fi
 
 if ! id "$SERVICE_USER" >/dev/null 2>&1; then
-  useradd --system --home-dir "$STATE_DIR" --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+    useradd --system --gid "$SERVICE_GROUP" --home-dir "$STATE_DIR" --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
 fi
 
-install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0750 "$CONFIG_DIR"
-install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0750 "$STATE_DIR"
-install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0750 "$LOG_DIR"
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$CONFIG_DIR"
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$STATE_DIR"
+install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$LOG_DIR"
 
-install -o root -g root -m 0755 "$BINARY" "$PREFIX/bin/$BINARY_NAME"
-install -o root -g root -m 0644 "$SERVICE_FILE" "/etc/systemd/system/$SERVICE_NAME"
+install -m 0755 "$BINARY" "$PREFIX/dextr-http"
+install -m 0644 "$UNIT" "/etc/systemd/system/$SERVICE_NAME"
 
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl restart "$SERVICE_NAME"
 
-sleep 1
-
-if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-  echo "Ошибка: DEXTR Commander не запустился." >&2
-  systemctl status "$SERVICE_NAME" --no-pager >&2 || true
-  journalctl -u "$SERVICE_NAME" --no-pager -n 50 >&2 || true
-  exit 1
-fi
+echo
+echo "Проверка установки..."
+systemctl is-enabled --quiet "$SERVICE_NAME" || die "автозапуск службы не включён."
+systemctl is-active --quiet "$SERVICE_NAME" || {
+    systemctl status "$SERVICE_NAME" --no-pager || true
+    die "служба DEXTR Commander не запустилась."
+}
 
 echo
 echo "DEXTR Commander установлен."
-echo "Служба:       active"
-echo "Автозапуск:   enabled"
-echo "Пользователь: $SERVICE_USER"
-echo "Программа:    $PREFIX/bin/$BINARY_NAME"
-echo "Конфигурация: $CONFIG_DIR"
-echo "Состояние:    $STATE_DIR"
-echo "Журнал:       $LOG_DIR"
+echo "Служба: работает"
+echo "Автозапуск: включён"
+echo "MCP: http://127.0.0.1:8787/mcp"
 echo
-echo "Для проверки:"
-echo "  systemctl status $SERVICE_NAME --no-pager"
+echo "Проверка:"
+echo "  systemctl status $SERVICE_NAME"
 echo "  journalctl -u $SERVICE_NAME --no-pager -n 50"
